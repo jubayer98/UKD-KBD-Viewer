@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>stlite app</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.66.0/build/stlite.css"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.66.0/build/stlite.js"></script>
+    <script>
+stlite.mount(
+  {
+    requirements: [],
+    entrypoint: "streamlit_app.py",
+    files: {
+"streamlit_app.py": `import streamlit as st
+import pandas as pd
+
+st.set_page_config(page_title="KBD-Viewer [0.1v]", page_icon=":dna:")
+
+def load_sample_file(sample_file):
+    """Load and return the dataframe from the uploaded file."""
+    try:
+        sample_df = pd.read_csv(sample_file, delimiter='#')
+        # check if the delimiter is correct by looking for more than one column
+        if sample_df.shape[1] == 1:
+            st.error("Error: The file does not use '#' as a delimiter.")
+            return None
+        return sample_df
+    except Exception as e:
+        st.error(f"An error occurred while reading the file: {e}")
+        return None
+
+def display_sample_dataframe(df, sample_file):
+    """Display dataframe in Streamlit with options to select columns."""
+    # create a list of column names in lowercase
+    column_names = df.columns.str.lower()
+    # multiselect widget with column names, converting user input to lowercase for matching
+    selected_columns = st.multiselect(
+        "Select columns to display:",
+        options=column_names,
+        format_func=lambda x: df.columns[column_names.tolist().index(x)]
+    )
+
+    if selected_columns:
+        # convert selected columns back to original casing
+        selected_columns = [df.columns[column_names.tolist().index(col)] for col in selected_columns]
+        df_filtered = df[selected_columns]
+        st.dataframe(df_filtered)
+    else:
+        df_filtered = df
+        st.dataframe(df_filtered)
+
+    # download button for filtered data
+    output_file = df_filtered.to_csv(sep='#', index=False)
+    st.download_button(
+        label="Download Filtered Data",
+        data=output_file,
+        file_name=f"{sample_file.split('.')[0]}_filtered.txt",
+        mime="text/csv",
+        key="download-filtered-data"
+    )
+
+
+def apply_st_filters(original_data, sample_data):
+
+    """Apply filters based on sidebar user inputs."""
+    st.sidebar.header("Filter Options")
+    denovo_status = st.sidebar.multiselect("Denovo Status", options=sample_data['denovo'].unique())
+    tier_status = st.sidebar.multiselect("Tier Status", options=sample_data['tier_status'].unique())
+    consequence = st.sidebar.multiselect("Consequence", options=sample_data['Consequence'].unique())
+    gene_symbols = st.sidebar.multiselect("GENE SYMBOL", options=sample_data['SYMBOL'].unique())
+
+    if denovo_status:
+        sample_data = sample_data[sample_data['denovo'].isin(denovo_status)]
+    if tier_status:
+        sample_data = sample_data[sample_data['tier_status'].isin(tier_status)]
+    if consequence:
+        sample_data = sample_data[sample_data['Consequence'].isin(consequence)]
+    if gene_symbols:
+        sample_data = sample_data[sample_data['SYMBOL'].isin(gene_symbols)]
+
+    # search box to filter based on a text input
+    search_query = st.sidebar.text_input("Specific Search")
+    if search_query:
+        sample_data = sample_data[sample_data.apply(lambda row: row.astype(str).str.contains(search_query).any(), axis=1)]
+    
+    # display row metrics in the sidebar
+    total_rows = len(original_data)
+    displayed_rows = len(sample_data)
+
+    st.sidebar.write(f"Row Statistics: {displayed_rows}/{total_rows}")
+
+    return sample_data
+
+def main():
+    st.title('WES/WGS Report Viewer [0.1v]')
+
+    sample_file = st.file_uploader("Choose a .txt ['#' delimiter only] file", type=['txt'])
+    if sample_file is not None:
+        # check file extension
+        if not sample_file.name.endswith('.txt'):
+            st.error("Error: Please upload a .txt ['#' delimiter only] file.")
+        else:
+            original_df = load_sample_file(sample_file)
+            if original_df is not None:
+                # Create a copy of the DataFrame to use for filtering
+                current_df = original_df.copy()
+                filtered_df = apply_st_filters(original_df, current_df)
+                display_sample_dataframe(filtered_df, sample_file.name)
+
+if __name__ == "__main__":
+    main()
+`,
+
+},
+  },
+  document.getElementById("root")
+)
+
+    </script>
+  </body>
+  <!-- Generated from stlite sharing (https://edit.share.stlite.net/), and the source version is c5d0338e9aace41ab17b948ad1d17799cf2e93d2 -->
+</html>
